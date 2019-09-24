@@ -70,9 +70,8 @@ preference = np.where(preference_direct != 0, preference_direct, preference_neig
 
 # plt.matshow(preference[:10, :10])
 
-ind_d = np.sum(-preference,axis=1).argsort()
-ind_d = np.array(ind_d[0:100])
-gt_ind = (-gt_tp_test).argsort()[0:100]
+ind_d = np.sum(-preference,axis=1).argsort()[0:100]
+gt_ind = (-gt_tp_test).argsort()
 gt_ind = np.array(gt_ind[0,0:100])
 
 recall = np.intersect1d(ind_d,gt_ind)
