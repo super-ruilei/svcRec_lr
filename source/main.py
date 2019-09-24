@@ -1,46 +1,6 @@
 import pandas as pd
-import random
 import matplotlib.pyplot as plt
-import scipy
-from scipy import sparse
-from sklearn import neighbors
 import numpy as np
-
-RAW_USRLIST = "../dataset/userlist.txt"
-RAW_WSLIST = "../dataset/wslist.txt"
-RAW_TPMATRIX = "../dataset/tpMatrix.txt"
-RAW_RTMATRIX = "../dataset/rtMatrix.txt"
-
-UserMatrix = pd.read_csv(RAW_USRLIST, sep='\t', skiprows=[1], index_col=0)
-WSMatrix = pd.read_csv(RAW_WSLIST, sep='\t', skiprows=[1], index_col=0)
-TPMatrix = pd.read_csv(RAW_TPMATRIX, sep='\t', header=None)
-RTMatrix = pd.read_csv(RAW_RTMATRIX, sep='\t', header=None)
-
-TPMatrix.drop(TPMatrix.shape[1] - 1, axis=1, inplace=True)
-RTMatrix.drop(RTMatrix.shape[1] - 1, axis=1, inplace=True)
-
-# remove [] for the feature key
-for table in [UserMatrix, WSMatrix]:
-    table.rename(
-        columns={origin: origin[1:-1] for origin in table.columns},
-        inplace=True
-    )
-
-RTSparse = RTMatrix.apply(lambda row: row.sample(frac=0.5, random_state=row.name), axis=1)
-TPSparse = TPMatrix.apply(lambda row: row.sample(frac=0.5, random_state=row.name), axis=1)
-
-distMatrix = pd.DataFrame([UserMatrix['Latitude'], UserMatrix['Longitude']]).T
-euclideanDist = neighbors.DistanceMetric.get_metric('haversine')
-userDistCorr = euclideanDist.pairwise(distMatrix)
-
-NUM_USER_TRAIN = 338
-NUM_USER_TEST = 1
-NUM_SERVICE = 5825
-K = 5
-tpTrain, tpTest = TPSparse[:NUM_USER_TRAIN], TPSparse[-NUM_USER_TEST:]
-tpTest.index = range(1)
-tpTestReplica = tpTest.append([tpTest] * (NUM_USER_TRAIN - NUM_USER_TEST), ignore_index=True)
-
 
 def cal_weight(u, v):
     uIndices, vIndices = np.where(~np.isnan(u)), np.where(~np.isnan(v))
@@ -48,34 +8,69 @@ def cal_weight(u, v):
     union = np.union1d(uIndices, vIndices)
     return len(intersect) / len(union)
 
-
-weight_u_v = tpTrain.apply(lambda u: cal_weight(u, tpTest), axis=1)
-krcc_u_v = tpTrain.corrwith(tpTestReplica, axis=1, method='kendall')
-sim_u_v = weight_u_v * krcc_u_v
-
-
 def calPre(u):
-    pre_val = np.zeros((NUM_SERVICE, NUM_SERVICE))
     testM = np.nan_to_num(u)
-    for (i, v) in enumerate(testM.ravel()):
-        pre_val[i] = np.sign(v - testM)
-        # pre_val[i] = np.sign(testM[i] - testM)
-    return pre_val
+    f = np.repeat(testM,NUM_SERVICE,axis=0).T
+    v = np.repeat(testM,NUM_SERVICE,axis=0)
+    pre_val = f - v
+    return np.sign(pre_val)
+
+NUM_USER_TRAIN = 299
+NUM_USER_TEST = 1
+NUM_SERVICE = 500
+NUM_USER = 300
+K = 60
+
+# step1. load groundtruth data
+RAW_TPMATRIX = "../dataset2/tpMatrix"
+TPMatrix = np.loadtxt(RAW_TPMATRIX,  delimiter='\t')
 
 
+# step2. form sparse data with sparse_rate
+spare_rate = np.array([0.1,0.3,0.5,1.0])
+sample_num = (NUM_SERVICE*spare_rate).astype(int)
+TPSparse = np.full([NUM_USER,NUM_SERVICE], np.nan)
+
+
+for i in range(NUM_USER):
+    p = np.random.choice(TPMatrix.shape[0], sample_num[0], replace=False);
+    TPSparse[i,p] = TPMatrix[i,p]
+
+
+# step3. split train and test
+tpTrain = TPSparse[NUM_USER_TEST:,:]
+gt_tp_test, tpTest = TPMatrix[0:NUM_USER_TEST,:],TPSparse[0:NUM_USER_TEST,:]
+
+
+# step4. cal krcc
+tptrain = pd.DataFrame(tpTrain)
+tptest = pd.DataFrame(np.repeat(tpTest,NUM_USER_TRAIN,axis=0))
+weight_u_v = tptrain.apply(lambda u: cal_weight(u, tptest), axis=1)
+krcc_u_v = tptrain.corrwith(tptest, axis=1, method='kendall')
+# sim_u_v = weight_u_v * krcc_u_v
+sim_u_v = krcc_u_v
+
+# step5. cal preference
 preference_direct = calPre(tpTest)
-
 top_k = [(i, v) for i, v in sorted(enumerate(sim_u_v), key=lambda t: t[1], reverse=True)][0:K]
 pre_sim = np.zeros((NUM_SERVICE, NUM_SERVICE))
+
+
 for (i, v) in top_k:
-    user = tpTrain.values[i]
+    user = tpTrain[i]
+    user = user[np.newaxis,:]
     pre_sim = pre_sim + v * calPre(user)
 preference_neighbor = np.sign(pre_sim)
 
 preference = np.where(preference_direct != 0, preference_direct, preference_neighbor)
 
-plt.matshow(preference[:10, :10])
+# plt.matshow(preference[:10, :10])
 
-service_with_index = [(i, v) for i, v in enumerate(preference.sum(axis=0))]
-target = sorted(service_with_index, key=lambda t: t[1])[::-1][0][0]
-print(target)
+ind_d = np.sum(-preference,axis=1).argsort()
+ind_d = np.array(ind_d[0:100])
+gt_ind = (-gt_tp_test).argsort()[0:100]
+gt_ind = np.array(gt_ind[0,0:100])
+
+recall = np.intersect1d(ind_d,gt_ind)
+print(recall.shape)
+

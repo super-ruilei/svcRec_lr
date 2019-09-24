@@ -35,7 +35,7 @@ GEN_RTMATRIX = "./dataset/rtMatrix.pref.txt"
 
 
 def WSUser(ID="0", IPAddr="0.0.0.0", Country="", IPNo="0", AS="0", Latitude="0", Longitude="0"):
-    scipy.sparse
+
     result = {}
     result['ID'] = ID
     result['IPAddr'] = IPAddr
@@ -382,7 +382,7 @@ def mainRun():
     result_pearson = getRecommendations(Pref_RTMatrix, "1", sim_pearson)
     result_geo = getRecommendations(Pref_RTMatrix, "1", sim_geo)
 
-        accuray_eculidean = getAccuracy("eculidean", result_eculidean)
+    accuray_eculidean = getAccuracy("eculidean", result_eculidean)
     accuray_pearson = getAccuracy("pearson", result_pearson)
     accuray_geo = getAccuracy( "geo",result_geo)
 
