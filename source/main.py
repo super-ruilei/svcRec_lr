@@ -10,9 +10,8 @@ def cal_weight(u, v):
 
 def calPre(u):
     testM = np.nan_to_num(u)
-    f = np.repeat(testM,NUM_SERVICE,axis=0).T
-    v = np.repeat(testM,NUM_SERVICE,axis=0)
-    pre_val = f - v
+    f = np.repeat(testM,NUM_SERVICE,axis=0)
+    pre_val = f.T - f
     non_value = np.where(testM == 0);
     pre_val[non_value[1],:] = 0;
     pre_val[:, non_value[1]] = 0;
@@ -70,10 +69,10 @@ preference = np.where(preference_direct != 0, preference_direct, preference_neig
 
 # plt.matshow(preference[:10, :10])
 
-ind_d = np.sum(-preference,axis=1).argsort()[0:100]
-gt_ind = (-gt_tp_test).argsort()
-gt_ind = np.array(gt_ind[0,0:100])
 
+# step6. cal recall
+ind_d = np.sum(-preference,axis=1).argsort()[0:100]
+gt_ind = np.array((-gt_tp_test).argsort()[0,0:100])
 recall = np.intersect1d(ind_d,gt_ind)
 print(recall.shape)
 
