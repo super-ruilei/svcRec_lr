@@ -13,6 +13,9 @@ def calPre(u):
     f = np.repeat(testM,NUM_SERVICE,axis=0).T
     v = np.repeat(testM,NUM_SERVICE,axis=0)
     pre_val = f - v
+    non_value = np.where(testM == 0);
+    pre_val[non_value[1],:] = 0;
+    pre_val[:, non_value[1]] = 0;
     return np.sign(pre_val)
 
 NUM_USER_TRAIN = 299
@@ -33,7 +36,7 @@ TPSparse = np.full([NUM_USER,NUM_SERVICE], np.nan)
 
 
 for i in range(NUM_USER):
-    p = np.random.choice(TPMatrix.shape[0], sample_num[0], replace=False);
+    p = np.random.choice(TPMatrix.shape[1], sample_num[0], replace=False);
     TPSparse[i,p] = TPMatrix[i,p]
 
 
@@ -59,7 +62,8 @@ pre_sim = np.zeros((NUM_SERVICE, NUM_SERVICE))
 for (i, v) in top_k:
     user = tpTrain[i]
     user = user[np.newaxis,:]
-    pre_sim = pre_sim + v * calPre(user)
+    # pre_sim = pre_sim + v * calPre(user)
+    pre_sim = pre_sim + calPre(user)
 preference_neighbor = np.sign(pre_sim)
 
 preference = np.where(preference_direct != 0, preference_direct, preference_neighbor)
